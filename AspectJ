@@ -1,0 +1,22 @@
+AspectJ 意思就是Java的Aspect，Java的AOP。
+它其实不是一个新的语言，它的核心是ajc（编译器）\weaver（织入器）。
+
+ajc编译器：基于Java编译器之上的，它是用来编译.aj文件，aspectj在Java编译器的基础上增加了一些它自己的关键字和方法。因此，ajc也可以编译Java代码。
+weaver织入器：为了在java编译器上使用AspectJ而不依赖于Ajc编译器，aspectJ 5出现了@AspectJ，使用注释的方式编写AspectJ代码，可以在任何Java编译器上使用。
+
+
+AndroidStudio默认是没有ajc编译器的，所以在Android中使用@AspectJ来编写（包括SpringAOP也是如此）。
+它在代码的编译期间扫描目标程序，根据切点（PointCut）匹配,
+将开发者编写的Aspect程序编织（Weave）到目标程序的.class文件中，
+对目标程序作了重构（重构单位是JoinPoint），
+目的就是建立目标程序与Aspect程序的连接（获得执行的对象、方法、参数等上下文信息），从而达到AOP的目的
+
+
+Advise 切入策略
+@Before、@After
+插入的逻辑放在 原JoinPoint逻辑的前面或者后面，不影响原逻辑
+@Around
+插入的逻辑完全替代原JoinPoint逻辑，但是保留是否要执行原逻辑的决定权。
+@AfterThrowing
+在原JoinPoint逻辑 抛出异常之后，该操作优先于下一个切点的@Befor
+
