@@ -1,4 +1,4 @@
-package com.example.androidaopdemo.ui.notifications;
+package com.tran.ui.notifications;
 
 import android.Manifest;
 import android.os.Bundle;
@@ -14,8 +14,9 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
-import com.example.androidaopdemo.R;
+import com.tran.R;
 
+import org.aop.annotation.PermissionDenied;
 import org.aop.annotation.RequestPermission;
 
 public class NotificationsFragment extends Fragment {
@@ -41,8 +42,14 @@ public class NotificationsFragment extends Fragment {
         return root;
     }
 
-    @RequestPermission(value = {Manifest.permission.WRITE_EXTERNAL_STORAGE})
+    @RequestPermission(value = {Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.CAMERA})
     private void test(){
-        Log.e("TAG", "test: --------------------> ");
+        Log.e("TAG", "test: --------------------> RequestPermission :");
     }
+
+    @PermissionDenied({Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.CAMERA})
+    public void onPermisDenied(String permission){
+        Log.e("TAG", "test: --------------------> onPermisDenied :"+permission);
+    }
+
 }

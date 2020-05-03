@@ -1,4 +1,4 @@
-package com.example.androidaopdemo.ui.home;
+package com.tran.ui.home;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -13,7 +13,10 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
-import com.example.androidaopdemo.R;
+import com.tran.R;
+
+import org.aop.annotation.SingleClick;
+
 
 public class HomeFragment extends Fragment {
 
@@ -43,6 +46,7 @@ public class HomeFragment extends Fragment {
     }
 
     //@NeedPermission(permissions = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA})
+    @SingleClick(tag = "124")
     private void perTest() {
         Log.e("TAG", "perTest: -----------------------> ");
     }

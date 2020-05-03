@@ -1,4 +1,4 @@
-package com.example.androidaopdemo.ui.home;
+package com.tran.ui.home;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;

@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -14,6 +13,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
+import org.aop.annotation.PermissionDenied;
 import org.aop.annotation.RequestPermission;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -25,7 +25,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @Aspect
@@ -40,6 +40,13 @@ public class PermissionAspect {
 
     private ProceedingJoinPoint pointMethod;
 
+    private boolean handleBidden, settingResuestAgain;
+
+    private Method deniedMethod;
+    private String[] deniedPerMisArg;
+
+    Object hostTarget;
+
     //this(Type) : 判断该JoinPoint所在的类是否是Type类型
     @Pointcut("this(android.app.Activity)")
     public void isActivity() {
@@ -53,28 +60,35 @@ public class PermissionAspect {
     public void isPermissionAnnotation() {
     }
 
+
     @Around("(isActivity()||isFragment()) && isPermissionAnnotation()")
     public void doRequsetPermissionAspectPoint(ProceedingJoinPoint joinPoint) throws Throwable {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
-            String methodName = methodSignature.getName();
-            Class[] types = methodSignature.getParameterTypes();
             Method method = methodSignature.getMethod();
             permission = method.getAnnotation(RequestPermission.class);
+            handleBidden = permission.handleForbidden();
+            settingResuestAgain = permission.toSettingAgain();
             Activity hostActivity;
-            Object target = joinPoint.getTarget();
-            if (target instanceof Activity) {
-                hostActivity = (Activity) target;
+            hostTarget = joinPoint.getTarget();
+            if (hostTarget instanceof Activity) {
+                hostActivity = (Activity) hostTarget;
             } else {
-                // Method getActivity = target.getClass().getDeclaredMethod("getActivity", null);
-                Method[] methods = target.getClass().getMethods();
+                Method[] methods = hostTarget.getClass().getMethods();
+                PermissionDenied deniedAnn;
                 Method getActivity = null;
                 for (Method targetMethod : methods) {
                     if (targetMethod.getName().equals("getActivity")) {
                         getActivity = targetMethod;
+                    } else {
+                        deniedAnn = targetMethod.getAnnotation(PermissionDenied.class);
+                        if (deniedAnn != null) {
+                            this.deniedMethod = targetMethod;
+                            this.deniedPerMisArg = deniedAnn.value();
+                        }
                     }
                 }
-                hostActivity = (Activity) getActivity.invoke(target);
+                hostActivity = (Activity) getActivity.invoke(hostTarget);
             }
 
             if (checkPermissionHandler(hostActivity, permission.value())) {
@@ -92,58 +106,89 @@ public class PermissionAspect {
         }
     }
 
-   // @Pointcut("execution(* *.onRequestPermissionsResult(..))")
-    public void onActivityPermissionResult(){
+    @Pointcut("execution(* *.onRequestPermissionsResult(..))")
+    public void onActivityPermissionResult() {
     }
 
 
-
-
-    /*-----------------------------------------------------------*/
-    //这里没有执行 1 问题就是出在这里
-    @Around("execution(* *.onRequestPermissionsResult(..))")
-    public void onRequestPermissionsResult(JoinPoint joinPoint) throws Throwable {
-        Log.e(TAG, "onRequestPermissionsResult---------------- > ");
+    @Around("onActivityPermissionResult()")
+    public void onRequestPermissionsResult(final ProceedingJoinPoint joinPoint) throws Throwable {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Object[] objects = joinPoint.getArgs();
             int resultCode = (int) objects[0];   //resultCode
             if (resultCode == REQUEST_PERMISSION_CODE) {
                 int[] grantResults = (int[]) objects[2];  //grantResults
+                String[] permissions = (String[]) objects[1];
+                List<String> deninePermissions = null;
                 boolean isPermissionsGranted = true;
-                for (int i = 0; i < grantResults.length; i++) {
+                int len = grantResults.length;
+                for (int i = 0; i < len; i++) {
                     if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
                         isPermissionsGranted = false;
-                        break;
+                        if (deninePermissions == null) {
+                            deninePermissions = new ArrayList<>(len);
+                        }
+                        deninePermissions.add(permissions[i]);
                     }
                 }
                 if (isPermissionsGranted) {
                     permissionGranted();
-                    return;
                 } else {
-                    doRefusePermissionAlertTask(joinPoint, objects);
+                    doRefusePermissionTask(joinPoint, deninePermissions);
                 }
-                return;
             }
         }
-        permissionGranted();
+        joinPoint.proceed();
     }
 
     /*-----------------------------------------------------------*/
     //这里没有执行 2 问题就是出在这里
-    @Before("execution(*  *.onActivityResult(..))")
+    @Before("execution(* *.onActivityResult(..))")
     public void onActivityResult(JoinPoint joinPoint) throws Throwable {
         Object[] objects = joinPoint.getArgs();
         int resultCode = (int) objects[0];
         if (resultCode == REQUEST_SETTING_CALL_BACK_CODE) {
+            Object target = joinPoint.getTarget();
             //TODO os system setting page back ， check and request again
-            if (checkPermissionHandler((Activity) joinPoint.getTarget(), permission.value())) {
-                permissionGranted();
-            } else {
-                permissionRefusedBySetting();
+
+            Class activityCompat = null;
+            Method checkSelfPermissionMethod = null;
+            boolean isChecked = false;
+            try {
+                activityCompat = Class.forName("android.support.v4.app.ActivityCompat");
+                checkSelfPermissionMethod = activityCompat.getMethod("checkSelfPermission", Context.class, String.class);
+                isChecked = true;
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage());
+            }
+            if (!isChecked) {
+                try {
+                    activityCompat = Class.forName("androidx.core.app.ActivityCompat");
+                    checkSelfPermissionMethod = activityCompat.getMethod("checkSelfPermission", Context.class, String.class);
+                } catch (Exception e) {
+                    Log.e(TAG, e.getMessage());
+                }
+            }
+            if (activityCompat != null && checkSelfPermissionMethod != null) {
+                String permisItem;
+                String[] permissions = permission.value();
+                int len = permissions.length;
+                for (int i = 0; i < permission.value().length; i++) {
+                    permisItem = permissions[i];
+                    int permissionStatus = (Integer) checkSelfPermissionMethod.invoke(activityCompat, (Activity) target, permisItem);
+                    if (permissionStatus == PackageManager.PERMISSION_GRANTED) {
+                        if (i == len - 1) {//全部权限得到授权时 才 callback
+                            permissionGranted();
+                        }
+                    } else {
+                        doRefusedCallbackTask(permisItem);
+                    }
+                }
             }
         }
     }
 
+    //call 申请权限task
     private void doRequsetUserPermissionTask(Activity activity, String... userpermission) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             //TODO  Reflects get  ActivityCompat obejct and  call  requestPermissions method requset userpermission
@@ -165,49 +210,60 @@ public class PermissionAspect {
         }
     }
 
-    private void doRefusePermissionAlertTask(final JoinPoint joinPoint, Object[] objects) {
+    //拒绝权限后的弹框 请求是否跳转到设置页面去打开权限
+    private void doRefusePermissionTask(final JoinPoint joinPoint, List<String> denine) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            final Activity activity = (Activity) joinPoint.getTarget();
-            for (String permission : Arrays.asList((String[]) objects[1])) {
-                if (!activity.shouldShowRequestPermissionRationale(permission) && !handlePermissionForbidden()) {
-                    int length = this.permission.tips().length;
-                    StringBuilder messageBuilder = new StringBuilder();
-                    if (length > 0) {
-                        for (int i = 0; i < length; i++) {
-                            messageBuilder.append(this.permission.tips()[i]);
+            final Object target = joinPoint.getTarget();
+            final Activity activity = (Activity) target;
+            for (String deninePer : denine) {
+                Log.e(TAG, "doRefusePermissionAlertTask: " + deninePer);
+                Log.e(TAG, "doRefusePermissionAlertTask: " + activity.shouldShowRequestPermissionRationale(deninePer));
+                Log.e(TAG, "doRefusePermissionAlertTask: " + isHandleForbidden(deninePer));
+                if (isHandleForbidden(deninePer)) {
+                    if (!activity.shouldShowRequestPermissionRationale(deninePer)) {
+                        if (isGoSettingPageRequsetAgain()) {
+                            int length = this.permission.tips().length;
+                            StringBuilder messageBuilder = new StringBuilder();
+                            if (length > 0) {
+                                for (int i = 0; i < length; i++) {
+                                    messageBuilder.append(this.permission.tips()[i]);
+                                }
+                            }
+                            onSettingAlertDialog(activity, messageBuilder.toString(), deninePer);
+                        } else {
+                            doRefusedCallbackTask(deninePer);
                         }
+                        break;
+                    } else {
+                        doRefusedCallbackTask(deninePer);
                     }
-                    AlertDialog alertDialog = new AlertDialog.Builder((Context) joinPoint.getTarget())
-                            .setTitle(this.permission.title())
-                            .setMessage(messageBuilder.toString())
-                            .setNegativeButton(this.permission.negativeText(), new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    dialog.dismiss();
-                                    permissionRefused();
-                                }
-                            }).setPositiveButton(this.permission.positiveText(), new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    startAppSettings((Activity) joinPoint.getTarget());
-                                }
-                            }).create();
-                    alertDialog.setCancelable(false);
-                    alertDialog.show();
-                    if (!TextUtils.isEmpty(this.permission.negativeTextColor())) {
-                        alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor(this.permission.negativeTextColor()));
-                    }
-                    if (!TextUtils.isEmpty(this.permission.positiveTextColor())) {
-                        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor(this.permission.positiveTextColor()));
-                    }
-                    break;
-                } else {
-                    permissionRefused();
                 }
             }
         }
     }
 
+    private void onSettingAlertDialog(Activity mActivity, String dialogMsg, String permission) {
+        AlertDialog alertDialog = new AlertDialog.Builder(mActivity)
+                .setTitle(this.permission.title())
+                .setMessage(dialogMsg)
+                .setNegativeButton(this.permission.negativeText(), (dialog, which) -> {
+                    dialog.dismiss();
+                    doRefusedCallbackTask(permission);
+                }).setPositiveButton(this.permission.positiveText(), (dialog, which) -> {
+                    dialog.dismiss();
+                    startAppSettings(mActivity);
+                }).create();
+        alertDialog.setCancelable(false);
+        alertDialog.show();
+        if (!TextUtils.isEmpty(this.permission.negativeTextColor())) {
+            alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor(this.permission.negativeTextColor()));
+        }
+        if (!TextUtils.isEmpty(this.permission.positiveTextColor())) {
+            alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor(this.permission.positiveTextColor()));
+        }
+    }
+
+    //只用所用权限都被授权才 callback
     private void permissionGranted() throws Throwable {
         if (pointMethod != null) {
             pointMethod.proceed();
@@ -216,43 +272,51 @@ public class PermissionAspect {
         }
     }
 
-    private void permissionRefused() {
-        Log.e(TAG, "permissionRefused: ---------------------->permissionRefused ");
-       /* if (pointMethod != null && pointMethod.getTarget() != null
-                && IPermissionRefuseListener.class.isAssignableFrom(pointMethod.getTarget().getClass())) {
-            ((IPermissionRefuseListener) pointMethod.getTarget()).permissionRefused();
-        }*/
+    private void doRefusedCallbackTask(String denPermission) {
+        if (this.deniedMethod != null && hostTarget != null) {
+            try {
+                if (deniedMethod.getGenericParameterTypes().length == 1) {
+                    this.deniedMethod.invoke(hostTarget, denPermission);
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    private boolean handlePermissionForbidden() {
-        Log.e(TAG, "handlePermissionForbidden: ---------------------->handlePermissionForbidden ");
-       /* if (pointMethod != null && pointMethod.getTarget() != null
-                && IPermissionRefuseListener.class.isAssignableFrom(pointMethod.getTarget().getClass())) {
-            return ((IPermissionRefuseListener) pointMethod.getTarget()).permissionForbidden();
-        }*/
+    private boolean isHandleForbidden(String permission) {
+        if (deniedMethod != null && handleBidden) {
+            //如果是有注解限制callback 那些权限则进行判断否则直接callback
+            if (deniedPerMisArg != null && deniedPerMisArg.length > 0) {
+                for (int i = deniedPerMisArg.length - 1; i >= 0; i--) {
+                    if (TextUtils.equals(permission, deniedPerMisArg[i])) {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
         return false;
     }
 
-    private void permissionRefusedBySetting() {
-        Log.e(TAG, "permissionRefusedBySetting: ---------------------->permissionRefusedBySetting ");
 
-        //TODO 这里需要通过注解回调到页面去中了
-     /*   if (pointMethod != null && pointMethod.getTarget() != null
-                && IPermissionRefuseListener.class.isAssignableFrom(pointMethod.getTarget().getClass())) {
-            ((IPermissionRefuseListener) pointMethod.getTarget()).permissionRefusedBySetting();
-        }*/
+    private boolean isGoSettingPageRequsetAgain() {
+        return settingResuestAgain;
     }
 
-    // 循环遍历查看权限数组
+
+    // 循环遍历查看权限数组 如果申请过权限并且已经授权了返回 true
     private boolean checkPermissionHandler(Activity activity, String... permissions) {
         Class activityCompat = null;
         Method checkSelfPermissionMethod = null;
-        Boolean isChecked = false;
+        boolean isChecked = false;
         try {
             activityCompat = Class.forName("android.support.v4.app.ActivityCompat");
             checkSelfPermissionMethod = activityCompat.getMethod("checkSelfPermission", Context.class, String.class);
             isChecked = true;
-            // } catch (ClassNotFoundException | NoSuchMethodException e) {
         } catch (Exception e) {
             Log.e(TAG, e.getMessage());
         }
@@ -260,20 +324,18 @@ public class PermissionAspect {
             try {
                 activityCompat = Class.forName("androidx.core.app.ActivityCompat");
                 checkSelfPermissionMethod = activityCompat.getMethod("checkSelfPermission", Context.class, String.class);
-                // } catch (ClassNotFoundException | NoSuchMethodException e) {
             } catch (Exception e) {
                 Log.e(TAG, e.getMessage());
             }
         }
         if (activityCompat != null && checkSelfPermissionMethod != null) {
-            List<String> permissionList = Arrays.asList(permissions);
+            String[] permissionList = permissions;
             for (String permission : permissionList) {
                 try {
                     int permissionStatus = (Integer) checkSelfPermissionMethod.invoke(activityCompat, activity, permission);
                     if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
                         return false;
                     }
-                    //} catch (IllegalAccessException | InvocationTargetException e) {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -282,7 +344,7 @@ public class PermissionAspect {
         return true;
     }
 
-    //
+
     private void startAppSettings(Activity activity) {
         Intent intent;
         try {

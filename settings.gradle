@@ -1,5 +1,5 @@
 rootProject.name='AndroidAopDemo'
 include ':app'
-include ':MAspect'
+include ':ModuleAspect'
 include ':dynamicfeature'
 include ':PluginAspect'

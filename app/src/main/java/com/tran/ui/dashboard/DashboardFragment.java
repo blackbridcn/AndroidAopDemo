@@ -1,4 +1,4 @@
-package com.example.androidaopdemo.ui.dashboard;
+package com.tran.ui.dashboard;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -12,7 +12,8 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
-import com.example.androidaopdemo.R;
+import com.tran.R;
+
 
 public class DashboardFragment extends Fragment {
 

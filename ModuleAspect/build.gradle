@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 
 android {
     compileSdkVersion 29
-    buildToolsVersion "29.0.2"
+    buildToolsVersion "29.0.3"
 
     defaultConfig {
         minSdkVersion 16
@@ -20,6 +20,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    compileOptions {
+        sourceCompatibility = 1.8
+        targetCompatibility = 1.8
+    }
 
 }
 
@@ -32,7 +36,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 
     //aspectjrt的依赖
-    implementation 'org.aspectj:aspectjrt:1.8.13'
+    implementation 'org.aspectj:aspectjrt:1.8.14'
 }
 
 buildscript {
@@ -41,9 +45,9 @@ buildscript {
     }
     dependencies {
         //编译器
-        classpath 'org.aspectj:aspectjtools:1.8.9'
+        classpath 'org.aspectj:aspectjtools:1.8.14'
         //织入器
-        classpath 'org.aspectj:aspectjweaver:1.8.9'
+        classpath 'org.aspectj:aspectjweaver:1.8.10'
     }
 }
 
