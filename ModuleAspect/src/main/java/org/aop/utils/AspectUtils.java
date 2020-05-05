@@ -10,6 +10,8 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -108,4 +110,9 @@ public class AspectUtils {
     }
 
 
+    @NotNull
+    public static Boolean isDoubleClick() {
+
+        return null;
+    }
 }

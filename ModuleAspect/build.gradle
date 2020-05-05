@@ -1,4 +1,6 @@
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 29
@@ -37,6 +39,8 @@ dependencies {
 
     //aspectjrt的依赖
     implementation 'org.aspectj:aspectjrt:1.8.14'
+    implementation "androidx.core:core-ktx:+"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
 
 buildscript {
@@ -95,4 +99,7 @@ android.libraryVariants.all { variant ->
             }
         }
     }
+}
+repositories {
+    mavenCentral()
 }

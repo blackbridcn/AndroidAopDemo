@@ -141,7 +141,6 @@ public class PermissionAspect {
         joinPoint.proceed();
     }
 
-    /*-----------------------------------------------------------*/
     //这里没有执行 2 问题就是出在这里
     @Before("execution(* *.onActivityResult(..))")
     public void onActivityResult(JoinPoint joinPoint) throws Throwable {
