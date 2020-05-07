@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProviders;
 
 import com.tran.R;
 
+import org.aop.annotation.CheckLogin;
 import org.aop.annotation.SingleClick;
 
 
@@ -39,6 +40,7 @@ public class HomeFragment extends Fragment {
         return root;
     }
 
+    @CheckLogin()
     private void initView(View root) {
         root.findViewById(R.id.text_home).setOnClickListener((view) -> {
             perTest();
