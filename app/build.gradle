@@ -42,6 +42,15 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 
+    implementation rootProject.ext.dependencies["butterknife"]
+    annotationProcessor rootProject.ext.dependencies["butterknife-compiler"]
+
+    compileOnly rootProject.ext.dependencies["autoService"]
+    annotationProcessor rootProject.ext.dependencies["autoService-compiler"]
+
+    compileOnly rootProject.ext.dependencies["lombok"]
+    annotationProcessor rootProject.ext.dependencies["lombok-compiler"]
+
     //aspectjrt的依赖
     implementation  'org.aspectj:aspectjrt:1.9.5'
     implementation project(path: ':ModuleAspect')

@@ -51,7 +51,7 @@ public class LoginAspect {
             Log.i(TAG, "isSkip =true 这里不需要检查登录状态~~~~~~");
             proceedingJoinPoint.proceed();
         } else {
-            if (true/*ModuleDataManager.getInstance().isLogin()*/) {
+            if (true/* ModuleDataManager.getInstance().isLogin()*/) {
                 proceedingJoinPoint.proceed();
                // LogUtils.i(TAG, "您已经登录过了~~~~");
                Log.i(TAG, "您已经登录过了~~~~");
