@@ -2,7 +2,7 @@
 
 ### 基于AspectJ 在Android中实现AOP Demo
 
-**主要基于AspectJ 和 gradle在AndroidStudio中在Application和Lib中实现AOP一个简单demo **
+** 主要基于AspectJ 和 gradle在AndroidStudio中在Application和Lib中实现AOP一个简单demo **
 
 
 ### LICENSE
